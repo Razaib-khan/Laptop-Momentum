@@ -1,0 +1,21 @@
+[project]
+name = "laptop-momentum"
+version = "1.0.0"
+description = "Local-first desktop app that tracks daily laptop activity for a streak and point system."
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "pyside6>=6.5.0",
+    "pynput>=1.7.6",
+    "pyinstaller>=6.20.0",
+]
+
+[project.scripts]
+laptop-momentum = "main:main"
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]

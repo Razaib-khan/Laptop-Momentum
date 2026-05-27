@@ -1,0 +1,36 @@
+# ── Python ──────────────────────────────────────────────
+__pycache__/
+*.py[oc]
+*.pyc
+*.pyo
+*.egg-info/
+wheels/
+*.egg
+.pytest_cache/
+*.log
+
+# ── Virtual environment ─────────────────────────────────
+.venv
+.venv/
+
+# ── Build artifacts ─────────────────────────────────────
+build/*
+dist/
+*.spec
+!build/laptop-momentum.spec
+
+# ── OS junk ─────────────────────────────────────────────
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# ── IDE / Editor ────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.vs/
+
+# ── Test files ──────────────────────────────────────────
+favicon_test.png
