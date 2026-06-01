@@ -66,11 +66,9 @@ jobs:
             REASON="Only ${{ steps.fetch.outputs.active_minutes }} active minute(s) reported today (need at least 2 for streak)"
           fi
 
+          BODY="🚨 Streak at Risk!"$'\n'"$REASON"$'\n'$'\n'"Get moving and save your streak! 💪"
           curl -s -X POST "https://ntfy.sh/${ALERT_TOPIC}" \
             -H "Title: Laptop Momentum — Streak Alert" \
             -H "Priority: high" \
             -H "Tags: warning" \
-            -d "🚨 Streak at Risk!
-$REASON
-
-Get moving and save your streak! 💪"
+            -d "$BODY"
