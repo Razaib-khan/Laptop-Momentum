@@ -1,5 +1,5 @@
 from app.database import Database
-from app import config
+import app.config as config
 
 
 class StreakManager:

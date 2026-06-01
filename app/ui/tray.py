@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.database import Database
-from app.config import DAY_BOUNDARY_HOUR, STREAK_MINIMUM_MINUTES, POINTS_THRESHOLD_MINUTES, MAX_LIFELINES
+import app.config as config
 from app.autostart_manager import AutostartManager
 from app.ui.dashboard import Dashboard
 
@@ -23,16 +23,16 @@ _RULES_TEXT = f"""\
 
 <h3>Streak</h3>
 <ul>
-  <li>Every day you are active for <b>{STREAK_MINIMUM_MINUTES}+ minutes</b> counts as a <em>streak day</em>.</li>
+  <li>Every day you are active for <b>{config.STREAK_MINIMUM_MINUTES}+ minutes</b> counts as a <em>streak day</em>.</li>
   <li>Consecutive streak days build your <b>current streak</b>.</li>
   <li>Your <b>longest streak</b> never decreases.</li>
-  <li>Days with fewer than {STREAK_MINIMUM_MINUTES} minutes can be saved by a <b>lifeline</b>.</li>
+  <li>Days with fewer than {config.STREAK_MINIMUM_MINUTES} minutes can be saved by a <b>lifeline</b>.</li>
 </ul>
 
 <h3>Points</h3>
 <ul>
-  <li>The first <b>{POINTS_THRESHOLD_MINUTES} minutes</b> of the day go toward the streak.</li>
-  <li>Every minute <em>beyond</em> {POINTS_THRESHOLD_MINUTES} earns <b>1 point</b>.</li>
+  <li>The first <b>{config.POINTS_THRESHOLD_MINUTES} minutes</b> of the day go toward the streak.</li>
+  <li>Every minute <em>beyond</em> {config.POINTS_THRESHOLD_MINUTES} earns <b>1 point</b>.</li>
   <li>Points accumulate across the week (Mon 4 AM to next Mon 4 AM).</li>
 </ul>
 
@@ -40,14 +40,14 @@ _RULES_TEXT = f"""\
 <ul>
   <li>Your <b>weekly target</b> is the number of points you aim to earn each week.</li>
   <li>For every <b>10 points over</b> the weekly target, you earn <b>1 lifeline</b>.</li>
-  <li>Maximum lifelines you can hold: <b>{MAX_LIFELINES}</b>.</li>
-  <li>A lifeline automatically saves a missed streak day when you have fewer than {STREAK_MINIMUM_MINUTES} active minutes.</li>
+  <li>Maximum lifelines you can hold: <b>{config.MAX_LIFELINES}</b>.</li>
+  <li>A lifeline automatically saves a missed streak day when you have fewer than {config.STREAK_MINIMUM_MINUTES} active minutes.</li>
 </ul>
 
 <h3>Day &amp; Week Boundaries</h3>
 <ul>
-  <li>Day runs from <b>{DAY_BOUNDARY_HOUR}:00</b> to the next day {DAY_BOUNDARY_HOUR}:00.</li>
-  <li>Week runs from <b>Monday {DAY_BOUNDARY_HOUR}:00</b> to the next Monday {DAY_BOUNDARY_HOUR}:00.</li>
+  <li>Day runs from <b>{config.DAY_BOUNDARY_HOUR}:00</b> to the next day {config.DAY_BOUNDARY_HOUR}:00.</li>
+  <li>Week runs from <b>Monday {config.DAY_BOUNDARY_HOUR}:00</b> to the next Monday {config.DAY_BOUNDARY_HOUR}:00.</li>
   <li>Weekly points reset at the week boundary.</li>
 </ul>
 
@@ -61,11 +61,85 @@ _RULES_TEXT = f"""\
   <li><b>Weekly Target Reached / Summary</b> &mdash; end-of-week recap.</li>
 </ul>
 
+<h3>Streak Freeze</h3>
+<ul>
+  <li>Once per week you can <b>freeze</b> your streak — a missed day won't break it (but also won't advance it).</li>
+  <li>Activate from the tray menu: <b>Freeze Streak This Week</b>.</li>
+  <li>Frozen days are checked before lifelines are consumed.</li>
+</ul>
+
+<h3>Session Bonus</h3>
+<ul>
+  <li><b>30 minutes</b> of uninterrupted activity unlocks the session bonus.</li>
+  <li>Every <b>2 minutes</b> of continued effort then earns <b>3 points</b> instead of 2.</li>
+  <li>The bonus resets if you go idle (no input for 60 s).</li>
+</ul>
+
+<h3>Morning &amp; Random Bonuses</h3>
+<ul>
+  <li>Your <b>first activity</b> each day awards a mystery bonus (1–5 extra points).</li>
+  <li>Every tick (10 s) has a <b>33 % chance</b> to drop a bonus point.</li>
+</ul>
+
+<h3>Activity Quality</h3>
+<ul>
+  <li>The app evaluates how <em>human</em> your input looks — typing + mouse movement, irregular timing, etc.</li>
+  <li>High-quality activity = full credit. Automated / scripted input gets reduced or zero credit.</li>
+  <li>A quality indicator (●) on the dashboard shows the current level.</li>
+</ul>
+
 <h3>Tips</h3>
 <ul>
   <li>Points and streak are <em>separate</em> &mdash; you earn points even on non-streak days.</li>
   <li>The app tracks real keyboard &amp; mouse activity, not just screen-on time.</li>
   <li>Idle time (no input for 60 s) is ignored.</li>
+  <li>A <b>progress bar</b> on the dashboard shows your weekly points at a glance.</li>
+  <li>Long streaks unlock <b>tiers</b>: 7d → Consistent, 30d → Dedicated, 100d → Unstoppable, 365d → Legendary.</li>
+</ul>
+
+<h3>Activity Quality</h3>
+<ul>
+  <li>The app evaluates how <em>human</em> your input looks — typing, mouse movement, irregular timing.</li>
+  <li><b>High</b> quality (≥50%) = 100% credit.</li>
+  <li><b>Medium</b> quality (≥20%) = 50% credit.</li>
+  <li><b>Low</b> quality (&lt;20%) = 0% credit (suspected automation).</li>
+  <li>A quality indicator dot (●) on the dashboard shows green / yellow / red.</li>
+</ul>
+
+<h3>Lifelines &amp; Debt</h3>
+<ul>
+  <li>Every 10 points over the weekly target earns 1 lifeline.</li>
+  <li>Max lifelines: 3. You can also go into debt up to <b>2 lifelines</b> (repaid from future earnings).</li>
+</ul>
+
+<h3>Bonuses</h3>
+<ul>
+  <li><b>Morning bonus</b> — first activity before noon each day awards 1–5 extra points.</li>
+  <li><b>Random bonus</b> — every tick (10 s) has a 33% chance to drop a bonus point.</li>
+  <li><b>Session bonus</b> — 30 min uninterrupted activity unlocks 3 points per 2 min instead of 1.</li>
+</ul>
+
+<h3>Daily Target &amp; Focus Sessions</h3>
+<ul>
+  <li>Set a <b>daily active target</b> (10–240 min) from the tray menu.</li>
+  <li>Complete <b>focus sessions</b> (20 min uninterrupted) — tracked on dashboard.</li>
+</ul>
+
+<h3>Vacation Mode</h3>
+<ul>
+  <li>Toggle from the tray menu. Each missed day consumes a lifeline (up to 3 days).</li>
+</ul>
+
+<h3>Achievements</h3>
+<ul>
+  <li>Unlock achievements by reaching milestones: First Step (7d), Dedicated (30d), Early Bird, Night Owl, Marathoner (100 h), Centurion (1000 pts/week), Focus Master (50 sessions).</li>
+</ul>
+
+<h3>Dashboard</h3>
+<ul>
+  <li>Real-time timer (quality-discounted), weekly progress bar, trend arrow (▲/▼/→).</li>
+  <li>Calendar heatmap, personal bests, lifetime total, records.</li>
+  <li>Export data as CSV from the tray menu.</li>
 </ul>
 """
 
@@ -634,16 +708,38 @@ class TrayIcon(QSystemTrayIcon):
         self._toggle_notifications_action.setChecked(True)
         menu.addAction(self._toggle_notifications_action)
 
+        self._toggle_freeze_action = QAction("Freeze Streak This Week", self)
+        self._toggle_freeze_action.setCheckable(True)
+        freeze_key = f"freeze_used_{config.get_week_key()}"
+        self._toggle_freeze_action.setChecked(self._db.get_setting(freeze_key) == "1")
+        menu.addAction(self._toggle_freeze_action)
+
+        self._toggle_vacation_action = QAction("Vacation Mode", self)
+        self._toggle_vacation_action.setCheckable(True)
+        self._toggle_vacation_action.setChecked(self._db.get_setting("vacation_mode") == "1")
+        menu.addAction(self._toggle_vacation_action)
+
         self._autostart_action = QAction("Run at Login", self)
         self._autostart_action.setCheckable(True)
         autostart = AutostartManager()
         self._autostart_action.setChecked(autostart.is_enabled())
         menu.addAction(self._autostart_action)
 
+        self._toggle_phone_reminder_action = QAction("Phone Reminder", self)
+        self._toggle_phone_reminder_action.setCheckable(True)
+        self._toggle_phone_reminder_action.setChecked(self._db.get_setting("phone_reminder_enabled") == "1")
+        self._toggle_phone_reminder_action.setEnabled(
+            bool(config.NTFY_TOPIC))
+        menu.addAction(self._toggle_phone_reminder_action)
+
+        self._daily_target_action = menu.addAction("Set Daily Target...")
+
         menu.addSeparator()
         self._rules_action = menu.addAction("Rules...")
+        self._export_action = menu.addAction("Export Data (CSV)...")
         self._restart_action = menu.addAction("Restart App")
         menu.addSeparator()
+        self._reset_action = menu.addAction("Reset All Progress...")
         self._exit_action = menu.addAction("Exit")
 
         self.setContextMenu(menu)
@@ -653,9 +749,15 @@ class TrayIcon(QSystemTrayIcon):
         self._show_status_action.triggered.connect(self._show_status)
         self._open_dashboard_action.triggered.connect(self._open_dashboard)
         self._toggle_notifications_action.toggled.connect(self._toggle_notifications)
+        self._toggle_freeze_action.toggled.connect(self._toggle_freeze)
+        self._toggle_vacation_action.toggled.connect(self._toggle_vacation)
+        self._toggle_phone_reminder_action.toggled.connect(self._toggle_phone_reminder)
         self._autostart_action.triggered.connect(self._toggle_autostart)
+        self._daily_target_action.triggered.connect(self._set_daily_target)
         self._rules_action.triggered.connect(self._show_rules)
+        self._export_action.triggered.connect(self._export_csv)
         self._restart_action.triggered.connect(self._restart_app)
+        self._reset_action.triggered.connect(self._reset_progress)
         self._exit_action.triggered.connect(self._exit_app)
 
         # Clicking the icon — deferred with a zero-timer so it never interrupts
@@ -686,20 +788,35 @@ class TrayIcon(QSystemTrayIcon):
             f"Week:   {s['weekly_points']} / {s['weekly_target']} pts",
             f"Lifelines: {s['lifelines']}",
         ]
+        debt = s.get("lifeline_debt", 0)
+        if debt > 0:
+            lines.append(f"Debt: {debt}")
+        vacation = s.get("vacation_mode", False)
+        if vacation:
+            lines.append(f"Vacation: {s.get('vacation_days_used', 0)}/{config.VACATION_MAX_DAYS} days")
         self.showMessage("Laptop Momentum", "\n".join(lines),
                          QSystemTrayIcon.Information, 5000)
 
     def _open_dashboard(self):
+        logger.info("_open_dashboard called, monitor=%s, dashboard_exists=%s",
+                    self._monitor is not None, self._dashboard is not None)
         if self._monitor is None:
             logger.warning("Dashboard requested before monitor is ready")
             return
         try:
             if self._dashboard is None:
                 self._dashboard = Dashboard(self._monitor.get_state)
+                logger.info("Dashboard widget created successfully")
             self._dashboard.show()
             self._dashboard.raise_()
             self._dashboard.activateWindow()
-            logger.debug("Dashboard opened")
+            v = self._dashboard.isVisible()
+            w = self._dashboard.width()
+            h = self._dashboard.height()
+            x = self._dashboard.x()
+            y = self._dashboard.y()
+            logger.info("Dashboard shown: visible=%s, size=%dx%d, pos=(%d,%d)",
+                        v, w, h, x, y)
         except Exception:
             logger.exception("Failed to open dashboard")
 
@@ -712,6 +829,81 @@ class TrayIcon(QSystemTrayIcon):
     def _update_notification_action_text(self, enabled: bool):
         self._toggle_notifications_action.setText(
             "Notifications: On" if enabled else "Notifications: Off")
+
+    def _toggle_freeze(self, checked: bool):
+        freeze_key = f"freeze_used_{config.get_week_key()}"
+        self._db.set_setting(freeze_key, "1" if checked else "0")
+        if checked:
+            self._db.add_event("settings", "Streak freeze activated")
+            self._toggle_freeze_action.setText("Freeze Streak This Week (Active)")
+        else:
+            self._db.add_event("settings", "Streak freeze deactivated")
+            self._toggle_freeze_action.setText("Freeze Streak This Week")
+
+    def _toggle_vacation(self, checked: bool):
+        self._db.set_setting("vacation_mode", "1" if checked else "0")
+        if checked:
+            self._db.set_setting("vacation_days_used", "0")
+            self._db.add_event("settings", "Vacation mode activated")
+            self._notify_vacation("Started")
+        else:
+            self._db.add_event("settings", "Vacation mode deactivated")
+            self._notify_vacation("Ended")
+        if self._monitor:
+            self._monitor.refresh_state()
+
+    def _toggle_phone_reminder(self, checked: bool):
+        self._db.set_setting("phone_reminder_enabled", "1" if checked else "0")
+        if checked:
+            self._db.add_event("settings", "Phone reminder enabled")
+        else:
+            self._db.add_event("settings", "Phone reminder disabled")
+
+    def _set_daily_target(self):
+        from PySide6.QtWidgets import QInputDialog
+        current = self._db.get_daily_target()
+        value, ok = QInputDialog.getInt(
+            None, "Set Daily Target",
+            f"Daily active minutes goal ({config.DAILY_TARGET_MIN}–{config.DAILY_TARGET_MAX}):",
+            value=current,
+            minValue=config.DAILY_TARGET_MIN,
+            maxValue=config.DAILY_TARGET_MAX,
+        )
+        if ok:
+            self._db.set_daily_target(value)
+            self._db.add_event("settings", f"Daily target set to {value} min")
+            if self._monitor:
+                self._monitor.refresh_state()
+
+    def _notify_vacation(self, status: str):
+        try:
+            self.showMessage(
+                "Vacation Mode",
+                f"{status}. Your streak is protected — each day off consumes a lifeline.",
+                QSystemTrayIcon.Information, 5000,
+            )
+        except Exception:
+            pass
+
+    def _export_csv(self):
+        """Export daily stats to a CSV file."""
+        from PySide6.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getSaveFileName(
+            None, "Export Data", "momentum_export.csv",
+            "CSV Files (*.csv)",
+        )
+        if not path:
+            return
+        ok = self._db.export_csv(path)
+        if ok:
+            self._db.add_event("export", f"Data exported to {path}")
+            self.showMessage("Laptop Momentum",
+                             f"Data exported to {path}",
+                             QSystemTrayIcon.Information, 5000)
+        else:
+            self.showMessage("Laptop Momentum",
+                             "Export failed — check the log for details.",
+                             QSystemTrayIcon.Warning, 5000)
 
     def _toggle_autostart(self, checked: bool):
         mgr = AutostartManager()
@@ -780,6 +972,33 @@ class TrayIcon(QSystemTrayIcon):
         self._monitor.stop()
         QApplication.instance().quit()
 
+    def _reset_progress(self):
+        """Wipe all progress after user confirmation."""
+        reply = QMessageBox.question(
+            None, "Reset All Progress",
+            "This will permanently delete ALL your streak data, points, "
+            "and history.\n\nAre you sure?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        reply2 = QMessageBox.question(
+            None, "Are You Absolutely Sure?",
+            "This cannot be undone. Your entire history will be gone.\n\n"
+            "Proceed?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply2 != QMessageBox.Yes:
+            return
+        self._monitor.stop()
+        self._db.reset_all()
+        # Reinit monitor with fresh state.
+        self._monitor.start()
+        self._monitor.refresh_state()
+        self.showMessage("Laptop Momentum",
+                         "All progress has been reset. Starting fresh!",
+                         QSystemTrayIcon.Information, 5000)
+
     def _on_activated(self, reason: QSystemTrayIcon.ActivationReason):
         """Handle tray icon clicks.
 
@@ -803,6 +1022,20 @@ class TrayIcon(QSystemTrayIcon):
             f"Week: {state['weekly_points']} / {state['weekly_target']} pts\n"
             f"Today: {state['today_active_minutes']} min"
         )
+        # Refresh freeze action checkbox for the current week.
+        freeze_key = f"freeze_used_{config.get_week_key()}"
+        freeze_active = self._db.get_setting(freeze_key) == "1"
+        self._toggle_freeze_action.setChecked(freeze_active)
+        self._toggle_freeze_action.setText(
+            "Freeze Streak This Week (Active)" if freeze_active
+            else "Freeze Streak This Week"
+        )
+        # Refresh vacation toggle.
+        vac_active = self._db.get_setting("vacation_mode") == "1"
+        self._toggle_vacation_action.setChecked(vac_active)
+        # Refresh phone reminder toggle.
+        phone_active = self._db.get_setting("phone_reminder_enabled") == "1"
+        self._toggle_phone_reminder_action.setChecked(phone_active)
         # Keep the dashboard in sync if it's open.
         if self._dashboard is not None and self._dashboard.isVisible():
             self._dashboard.refresh()

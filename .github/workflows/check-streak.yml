@@ -1,0 +1,106 @@
+name: Laptop Momentum — Streak Check
+
+on:
+  # Runs at 8 PM your local time daily.
+  # Default cron is 8 PM IST (UTC+05:30). Adjust for your timezone:
+  #   UTC±0:     0 20 * * *
+  #   UTC+5:30:  30 14 * * *   ← default (India)
+  #   UTC+1:     0 19 * * *
+  #   UTC-5:     0  1 * * *
+  #   UTC-8:     0  4 * * *
+  schedule:
+    - cron: '35 14 * * *'
+  workflow_dispatch:
+
+jobs:
+  check-streak:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch recent heartbeats
+        id: fetch
+        env:
+          TOPIC: ${{ secrets.NTFY_STATUS_TOPIC }}
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" "https://ntfy.sh/${TOPIC}/json?poll=1" 2>/dev/null)
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "status=error" >> "$GITHUB_OUTPUT"
+            echo "reason=ntfy returned HTTP $HTTP_CODE"
+            exit 0
+          fi
+
+          # Parse the last 3 "message" event lines (covers ~90 min of heartbeats)
+          MSG_LINES=$(echo "$BODY" | grep '"event":"message"' | tail -3)
+
+          if [ -z "$MSG_LINES" ]; then
+            echo "status=no_heartbeat" >> "$GITHUB_OUTPUT"
+            echo "reason=No heartbeat messages found in topic"
+            exit 0
+          fi
+
+          # Check if ANY of the last 3 heartbeats say streak is safe
+          SAFE=false
+          MAX_ACTIVE=0
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            HEARTBEAT=$(echo "$line" | python3 -c "
+import sys, json
+data = json.loads(sys.stdin.read())
+print(data.get('message', '{}'))
+" 2>/dev/null)
+
+            ACTIVE=$(echo "$HEARTBEAT" | python3 -c "
+import sys, json
+try:
+    data = json.loads(sys.stdin.read())
+    print(data.get('active_minutes', 0))
+except:
+    print(0)
+" 2>/dev/null)
+
+            [ "$ACTIVE" -gt "$MAX_ACTIVE" ] && MAX_ACTIVE=$ACTIVE
+
+            STREAK_SAFE=$(echo "$HEARTBEAT" | python3 -c "
+import sys, json
+try:
+    data = json.loads(sys.stdin.read())
+    print('true' if data.get('streak_safe', False) else 'false')
+except:
+    print('false')
+" 2>/dev/null)
+
+            if [ "$STREAK_SAFE" = "true" ]; then
+              SAFE=true
+            fi
+          done <<< "$MSG_LINES"
+
+          echo "status=ok" >> "$GITHUB_OUTPUT"
+          echo "streak_safe=$SAFE" >> "$GITHUB_OUTPUT"
+          echo "active_minutes=$MAX_ACTIVE" >> "$GITHUB_OUTPUT"
+          echo "reason=Checked heartbeats, streak_safe=$SAFE, max_active=$MAX_ACTIVE"
+
+      - name: Send alert if streak at risk
+        if: steps.fetch.outputs.status != 'ok' || steps.fetch.outputs.streak_safe != 'true'
+        env:
+          ALERT_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: |
+          STATUS="${{ steps.fetch.outputs.status }}"
+
+          if [ "$STATUS" = "no_heartbeat" ]; then
+            REASON="No activity data received today — laptop was likely off all day"
+          elif [ "$STATUS" = "parse_error" ] || [ "$STATUS" = "error" ]; then
+            REASON="Could not verify today's activity status"
+          else
+            REASON="Only ${{ steps.fetch.outputs.active_minutes }} active minute(s) reported today (need at least 2 for streak)"
+          fi
+
+          curl -s -X POST "https://ntfy.sh/${ALERT_TOPIC}" \
+            -H "Title: Laptop Momentum — Streak Alert" \
+            -H "Priority: high" \
+            -H "Tags: warning" \
+            -d "🚨 Streak at Risk!
+$REASON
+
+Get moving and save your streak! 💪"

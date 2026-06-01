@@ -1,4 +1,4 @@
-# ── Python ──────────────────────────────────────────────
+# Python
 __pycache__/
 *.py[oc]
 *.pyc
@@ -9,22 +9,22 @@ wheels/
 .pytest_cache/
 *.log
 
-# ── Virtual environment ─────────────────────────────────
+# Virtual environment
 .venv
 .venv/
 
-# ── Build artifacts ─────────────────────────────────────
+# Build artifacts
 build/*
 dist/
 *.spec
 !build/laptop-momentum.spec
 
-# ── OS junk ─────────────────────────────────────────────
+# OS junk
 Thumbs.db
 .DS_Store
 Desktop.ini
 
-# ── IDE / Editor ────────────────────────────────────────
+# IDE / Editor
 .idea/
 .vscode/
 *.swp
@@ -32,5 +32,8 @@ Desktop.ini
 *~
 .vs/
 
-# ── Test files ──────────────────────────────────────────
+# Test files
 favicon_test.png
+
+# Environment secrets
+.env

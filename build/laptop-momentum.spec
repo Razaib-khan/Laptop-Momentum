@@ -30,6 +30,7 @@ a = Analysis(
         'pynput.mouse._darwin',
         'pynput.keyboard._xorg',
         'pynput.mouse._xorg',
+        'PySide6.QtMultimedia',
     ],
     hookspath=[],
     hooksconfig={},

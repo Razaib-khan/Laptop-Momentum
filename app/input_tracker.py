@@ -8,12 +8,25 @@ except ImportError:
     mouse = None
     keyboard = None
 
+from app.activity_scorer import ActivityScorer
+
 logger = logging.getLogger(__name__)
+
+_MODIFIER_KEYS = {
+    keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r,
+    keyboard.Key.alt, keyboard.Key.alt_l, keyboard.Key.alt_r,
+    keyboard.Key.alt_gr,
+    keyboard.Key.shift, keyboard.Key.shift_l, keyboard.Key.shift_r,
+    keyboard.Key.cmd, keyboard.Key.cmd_l, keyboard.Key.cmd_r,
+} if keyboard is not None else set()
 
 
 class InputTracker:
     """Listens for global keyboard and mouse events and records the last
     activity timestamp.
+
+    Also feeds a quality scorer so the app can discount automated / scripted
+    input and only reward genuine human activity.
 
     Both listeners run as daemon threads so they are automatically cleaned up
     when the main process exits.
@@ -27,6 +40,9 @@ class InputTracker:
         self._keyboard_listener = None
         self._running = False
 
+        # Quality scorer.
+        self.scorer = ActivityScorer()
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -35,14 +51,15 @@ class InputTracker:
             return
         self._running = True
         self._last_activity = time.time()
+        self.scorer.reset()
 
         if mouse is not None and keyboard is not None:
             try:
-                self._mouse_listener = mouse.Listener(on_move=self._on_any,
-                                                       on_click=self._on_any,
-                                                       on_scroll=self._on_any)
-                self._keyboard_listener = keyboard.Listener(on_press=self._on_any,
-                                                            on_release=self._on_any)
+                self._mouse_listener = mouse.Listener(on_move=self._on_move,
+                                                       on_click=self._on_click,
+                                                       on_scroll=self._on_scroll)
+                self._keyboard_listener = keyboard.Listener(on_press=self._on_press,
+                                                             on_release=self._on_release)
                 self._mouse_listener.daemon = True
                 self._keyboard_listener.daemon = True
                 self._mouse_listener.start()
@@ -83,6 +100,27 @@ class InputTracker:
     # ------------------------------------------------------------------
     # Callbacks
     # ------------------------------------------------------------------
-    def _on_any(self, *args, **kwargs):
+    def _touched(self):
         with self._lock:
             self._last_activity = time.time()
+
+    def _on_move(self, x, y):
+        self._touched()
+        self.scorer.record_mouse_move()
+
+    def _on_click(self, x, y, button, pressed):
+        if pressed:
+            self._touched()
+            self.scorer.record_mouse_click()
+
+    def _on_scroll(self, x, y, dx, dy):
+        self._touched()
+        self.scorer.record_mouse_scroll()
+
+    def _on_press(self, key):
+        self._touched()
+        is_mod = key in _MODIFIER_KEYS if hasattr(key, '__hash__') else False
+        self.scorer.record_key(is_modifier=is_mod)
+
+    def _on_release(self, key):
+        self._touched()

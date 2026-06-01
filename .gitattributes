@@ -1,0 +1,21 @@
+# Normalize line endings to LF on commit, keep platform-native in working tree
+* text=auto
+
+# Python source files
+*.py text diff=python
+
+# Shell scripts (GitHub Actions)
+*.yml text
+*.yaml text
+
+# Markdown
+*.md text
+
+# Batch / PowerShell
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files
+*.ico binary
+*.png binary
+*.exe binary

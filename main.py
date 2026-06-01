@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QApplication
 from app import config
 from app.database import Database
 from app.notification_manager import NotificationManager
+from app.sound_manager import SoundManager
 from app.activity_monitor import ActivityMonitor
 from app.ui.tray import TrayIcon
 
@@ -109,6 +110,10 @@ def main():
     notifier = NotificationManager(tray)
     notifier.set_enabled(notifications_enabled)
 
+    # 9b. Sound manager (plays pleasant effects for milestones).
+    sound_mgr = SoundManager()
+    notifier.set_sound_manager(sound_mgr)
+
     # 10. Activity monitor (central coordinator — needs the notifier).
     monitor = ActivityMonitor(db, notifier)
 
@@ -132,6 +137,7 @@ def main():
 
     # 16. Clean up.
     monitor.stop()
+    sound_mgr.cleanup()
     db.close()
     logger.info("Application stopped")
 
