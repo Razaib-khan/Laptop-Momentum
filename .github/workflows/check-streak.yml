@@ -1,13 +1,6 @@
 name: Laptop Momentum — Streak Check
 
 on:
-  # Runs at 8 PM your local time daily.
-  # Default cron is 8 PM IST (UTC+05:30). Adjust for your timezone:
-  #   UTC±0:     0 20 * * *
-  #   UTC+5:30:  30 14 * * *   ← default (India)
-  #   UTC+1:     0 19 * * *
-  #   UTC-5:     0  1 * * *
-  #   UTC-8:     0  4 * * *
   schedule:
     - cron: '35 14 * * *'
   workflow_dispatch:
@@ -27,50 +20,28 @@ jobs:
 
           if [ "$HTTP_CODE" != "200" ]; then
             echo "status=error" >> "$GITHUB_OUTPUT"
-            echo "reason=ntfy returned HTTP $HTTP_CODE"
             exit 0
           fi
 
-          # Parse the last 3 "message" event lines (covers ~90 min of heartbeats)
+          # Latest 3 message events (ntfy returns line-delimited JSON)
           MSG_LINES=$(echo "$BODY" | grep '"event":"message"' | tail -3)
 
           if [ -z "$MSG_LINES" ]; then
             echo "status=no_heartbeat" >> "$GITHUB_OUTPUT"
-            echo "reason=No heartbeat messages found in topic"
             exit 0
           fi
 
-          # Check if ANY of the last 3 heartbeats say streak is safe
           SAFE=false
           MAX_ACTIVE=0
           while IFS= read -r line; do
             [ -z "$line" ] && continue
-            HEARTBEAT=$(echo "$line" | python3 -c "
-import sys, json
-data = json.loads(sys.stdin.read())
-print(data.get('message', '{}'))
-" 2>/dev/null)
+            HEARTBEAT=$(echo "$line" | jq -r '.message // "{}"')
+            ACTIVE=$(echo "$HEARTBEAT" | jq -r '.active_minutes // 0')
+            STREAK_SAFE=$(echo "$HEARTBEAT" | jq -r '.streak_safe // false')
 
-            ACTIVE=$(echo "$HEARTBEAT" | python3 -c "
-import sys, json
-try:
-    data = json.loads(sys.stdin.read())
-    print(data.get('active_minutes', 0))
-except:
-    print(0)
-" 2>/dev/null)
-
-            [ "$ACTIVE" -gt "$MAX_ACTIVE" ] && MAX_ACTIVE=$ACTIVE
-
-            STREAK_SAFE=$(echo "$HEARTBEAT" | python3 -c "
-import sys, json
-try:
-    data = json.loads(sys.stdin.read())
-    print('true' if data.get('streak_safe', False) else 'false')
-except:
-    print('false')
-" 2>/dev/null)
-
+            if [ "$ACTIVE" -gt "$MAX_ACTIVE" ]; then
+              MAX_ACTIVE=$ACTIVE
+            fi
             if [ "$STREAK_SAFE" = "true" ]; then
               SAFE=true
             fi
@@ -79,7 +50,6 @@ except:
           echo "status=ok" >> "$GITHUB_OUTPUT"
           echo "streak_safe=$SAFE" >> "$GITHUB_OUTPUT"
           echo "active_minutes=$MAX_ACTIVE" >> "$GITHUB_OUTPUT"
-          echo "reason=Checked heartbeats, streak_safe=$SAFE, max_active=$MAX_ACTIVE"
 
       - name: Send alert if streak at risk
         if: steps.fetch.outputs.status != 'ok' || steps.fetch.outputs.streak_safe != 'true'
