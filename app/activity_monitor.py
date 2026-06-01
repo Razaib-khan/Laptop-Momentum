@@ -265,6 +265,7 @@ class ActivityMonitor(QObject):
             self._db.set_daily_bonus_points(current_day, self._bonus_points_today)
 
         today_minutes = int(self._effective_active_seconds // 60)
+        active_minutes = today_minutes
 
         if not self._streak_threshold_notified_today:
             if today_minutes >= config.STREAK_MINIMUM_MINUTES:
@@ -291,7 +292,6 @@ class ActivityMonitor(QObject):
         if not self._streak_risk_notified_today:
             current_hour = datetime.now().hour
             if current_hour >= config.STREAK_RISK_NOTIFICATION_HOUR:
-                active_minutes = int(self._effective_active_seconds // 60)
                 if active_minutes < config.STREAK_MINIMUM_MINUTES:
                     streak = self._streak_mgr.get_current_streak()
                     if streak > 0:
@@ -304,7 +304,6 @@ class ActivityMonitor(QObject):
         if phone_enabled and PhoneNotifier.is_configured():
             current_hour = datetime.now().hour
             if current_hour >= config.PHONE_NOTIFIER_HOUR:
-                active_minutes = int(self._effective_active_seconds // 60)
                 if active_minutes < config.STREAK_MINIMUM_MINUTES:
                     elapsed = time.time() - self._last_phone_risk_check
                     if elapsed >= config.PHONE_NOTIFIER_INTERVAL * 60:
